@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "talamus-promulgator"
+version = "0.0.0"
+description = "Git and Markdown Powered CMS"
+authors = ["Tero Niemi <talamus@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "promulgator"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pyyaml = "^6.0.1"
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.9.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

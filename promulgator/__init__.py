@@ -1,0 +1,1 @@
+from .promulgator import promulgator
