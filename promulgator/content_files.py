@@ -1,5 +1,7 @@
 from .__imports import *
 
+"""Converts a list of paths to a list of file names, directories and configurations."""
+
 
 def get_content_files_to_be_published(paths: list[Path]) -> list[dict]:
     """### Seek files to be published
@@ -16,7 +18,7 @@ def get_content_files_to_be_published(paths: list[Path]) -> list[dict]:
     }
     ```
 
-    Throws `FileSeekingError` if something goes wrong.
+    Throws `SetupError` if something goes wrong.
     """
     content_files = {}  # (content_dir, content_file) -> (root_dir, root_config)
 
@@ -41,7 +43,7 @@ def _split_to_dir_and_filename(path: Path) -> tuple[DirName, FileName]:
 
     If path is a directory, then `content_file` is `None`.
 
-    Throws `FileSeekingError` if file is not a markdown file,
+    Throws `SetupError` if file is not a markdown file,
     or dir is not found.
     """
     path = os.path.abspath(path)
@@ -51,14 +53,17 @@ def _split_to_dir_and_filename(path: Path) -> tuple[DirName, FileName]:
 
         # Sanity check:
         if not CONTENT_FILE_RE.search(content_file):
-            raise FileSeekingError(f"{path} is not a markdown file")
+            raise SetupError(
+                f"{path} is not a markdown file",
+                "Only files with a .md extension are recognized as markdown files."
+            )
 
     elif os.path.isdir(path):
         content_dir = path
         content_file = None
 
     else:
-        raise FileSeekingError(f"{path} is not a file or directory")
+        raise SetupError(f"{path} is not a file or directory")
 
     return (content_dir, content_file)
 
@@ -71,15 +76,24 @@ def _seek_content_root(content_dir: DirName) -> tuple[DirName, Config]:
 
     Returns a tuple: `(root_dir, root_config)`
 
-    Throws `FileSeekingError` if no parent directory is found.
+    Throws `SetupError` if no parent directory is found.
     """
     current_dir = os.path.abspath(content_dir)
 
     for limit in range(999):  # Better than `while True:`...
         for file in os.listdir(current_dir):
             if ROOT_CONFIG_FILE_RE.search(file):
-                with open(os.path.join(current_dir, file)) as stream:
+                root_config_file = os.path.join(current_dir, file)
+                with open(root_config_file) as stream:
                     root_config = yaml.safe_load(stream)
+                    if root_config is None:
+                        root_config = {}
+                    if type(root_config) is not dict:
+                        raise SetupError(
+                            f"{root_config_file} is not a YAML map",
+                            "Configuration files must contain key-value pairs only."
+                        )
+
                 return (current_dir, root_config)
 
         (current_dir, previous_dir) = os.path.split(current_dir)
@@ -87,8 +101,10 @@ def _seek_content_root(content_dir: DirName) -> tuple[DirName, Config]:
         if current_dir == previous_dir:
             break
 
-    raise FileSeekingError(
-        ".promulgator file was not found in the parent directories of {content_dir}"
+    raise SetupError(
+        f".promulgator file was not found in any of the parent directories of {content_dir}",
+        "To be able to publish any files you have to create a .promulgator file "
+        "to the root of the publishable directory structure. See documentation for details."
     )
 
 
@@ -143,8 +159,16 @@ def _trim_paths_and_expand_configs(
         config = {}
         for file in os.listdir(absolute_dir):
             if METADATA_FILE_RE.search(file):
-                with open(os.path.join(absolute_dir, file)) as stream:
+                config_file = os.path.join(absolute_dir, file)
+                with open(config_file) as stream:
                     config = yaml.safe_load(stream)
+                    if config is None:
+                        config = {}
+                    if type(config) is not dict:
+                        raise SetupError(
+                            f"{config_file} is not a YAML map",
+                            "Configuration files must contain key-value pairs only."
+                        )
 
         # Get parent directory configuration
         if absolute_dir == root_dir:

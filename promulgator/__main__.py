@@ -13,26 +13,47 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     argparser.add_argument(
-        "content",
+        "paths",
         metavar="content",
         nargs="+",
         help="content to be processed (directory or a markdown file)",
     )
+    # argparser.add_argument(
+    #     "-c",
+    #     "--config",
+    #     action="count",
+    #     default=0,
+    #     help="increase output verbosity (-v = INFO, -vv = DEBUG)",
+    # )
     argparser.add_argument(
         "-v",
         "--verbose",
-        action="store_true",
-        help="be more verbose",
+        action="count",
+        default=0,
+        help="set output verbosity (-v = INFO, -vv = DEBUG)",
+    )
+    argparser.add_argument(
+        "-q",
+        "--quiet",
+        dest="verbose",
+        action="store_const",
+        const=-1,
+        help="Do not output anything",
     )
     argparser.epilog = """Here will be an example..."""
     return argparser.parse_args()
 
 
 if __name__ == "__main__":
-    args = vars(parse_args())
+    args = parse_args()
+    args.verbose = (
+        len(Verbosity) if args.verbose + 2 > len(Verbosity) else args.verbose + 2
+    )
+    args = {"paths": args.paths, "verbosity": Verbosity(args.verbose)}
+
     try:
         promulgator(**args)
-    except FileSeekingError as error:
-        print("Error:", error, file=sys.stderr)
+    except SetupError as error:
+        error.print()
         sys.exit(1)
     sys.exit(0)
